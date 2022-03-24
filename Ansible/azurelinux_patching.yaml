@@ -1,0 +1,16 @@
+---
+- name: azure-linux-patching
+  hosts: all
+  gather_facts: no
+  become: yes
+  tasks:
+  - name: upgrade all packages
+    yum:
+      name: '*'
+      state: latest
+    async: 40
+    poll: 1
+    register: results
+  - name: Store update results
+    shell:
+      cmd: "echo {{results}} >> /tmp/patchingresults.txt"

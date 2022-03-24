@@ -1,0 +1,20 @@
+#Production and Non Production Dynatrace Access Request Only
+#This document serves as the verbiage for what to paste in your 'comment' section in Work Flow Manager when you resolve a Dynatrace Access Request ticket.
+
+This ticket is resolved. Please have the provisioned user review the welcome instructions provided from the Dynatrace to the recipient's email.
+ 
+Dynatrace Non-Production UI:https://portal.nprod.dyn.vaec.va.gov/
+Dynatrace Production UI:https://portal.dyn.vaec.va.gov
+
+Thank you,
+
+###########################################################################################################################
+
+#Production Dynatrace Request Access Only
+#This document serves as the verbiage for what to paste in your 'comment' section in Work Flow Manager when you resolve a Dynatrace Access Request ticket.
+
+This ticket is resolved. Please have the provisioned user review the welcome instructions provided from the Dynatrace to the recipient's email. Dynatrace Production UI:
+
+Dynatrace-Prod UI: https://portal.dyn.vaec.va.gov
+
+Thank you,

@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  redshiftS3role:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "redshift.amazonaws.com",
+                                    "s3.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                      ]
+                    }
+      Description: Permissions for redshift to access S3
+      Policies: 
+        - PolicyDocument: 
+                Version: 2012-10-17
+                Statement:
+                  - Sid: AllowS3Access
+                    Effect: Allow
+                    Action:
+                      - s3:*
+                    Resource: 
+                      - !Sub arn:${AWS::Partition}:s3:::*
+          PolicyName: project-redshifttos3-role
+      RoleName: project-redshifttos3-role

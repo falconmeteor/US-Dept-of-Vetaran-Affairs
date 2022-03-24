@@ -1,0 +1,26 @@
+---
+
+- hosts: appdyn-group
+  tasks:
+  - name: Set environment variables
+    win_environment:
+      state: present
+      name: agentsTemp
+      value: C:\Temp\Agents
+      state: present
+      name: URL
+      value: https://coreinteastarm.blob.core.usgovcloudapi.net/dynatrace/Dynatrace-OneAgent-Windows-1.199.101.exe?sp=r&st=2020-09-11T20:06:13Z&se=2021-01-02T05:06:13Z&spr=https&sv=2019-10-10&sr=b&sig=TFb9OmTgteP%2B9ly8%2Bh7UIMQapiSmESBKjyehRp%2Ft51E%3D
+  - name: Create Temp Directory
+    win_file:
+      path: C:\Temp\Agents
+      state: directory
+  - name: Downlaod Install File
+    win_get_url:
+      url: '%URL%'
+      dest: '%agentsTemp%\Dynatrace-OneAgent-Windows-1.199.101.exe'
+  - name: Set execution policy
+    win_command: powershell.exe Set-ExecutionPolicy Bypass -Scope Process -Force
+  - name: Install Agent
+    win_command: 'powershell.exe Set-Location %agentsTemp%'
+  - name: execute Dynatrace Agent
+    win_shell: .\Dynatrace-OneAgent-Windows-1.199.101.exe --set-host-group=appdyn-GSS-PROD --quiet

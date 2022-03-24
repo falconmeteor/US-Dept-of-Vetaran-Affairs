@@ -1,0 +1,409 @@
+- name: vaec rhel 7 dsc
+  remote_user: "{{ssh_user}}"
+  become: yes
+  become_method: sudo
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Ansible delete file glob
+      find:
+        paths: /etc/yum.repos.d/
+        patterns: elastic*.repo
+      register: files_to_delete
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+    - name: Ansible remove file glob
+      file:
+        path: '{{ item.path }}'
+        state: absent
+      with_items: '{{ files_to_delete.files }}'
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+   
+    - name: Get Region
+      shell:
+        cmd: curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//'
+      register: region
+     
+    - name: Set Region Fact
+      set_fact: aws_region="{{ region.stdout }}"
+      
+    - name: Create VA Mirror List
+      copy:
+        dest: "/etc/yum.repos.d/va-mirror-base"
+        content: |
+          https://aws-west-repos.vaec.va.gov/repos
+          https://aws-east-repos.vaec.va.gov/repos
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+      
+    - name: VA-Binaries-Repo
+      yum_repository:
+        name: VA-Binaries
+        description: CSP yum repo to get VA specific binaries
+        file: va  
+        mirrorlist: file:///etc/yum.repos.d/va-mirror-base
+        gpgcheck: no
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+        
+  #Not all beats agents are installed yet
+    - name: Yum Install Beats Agents
+      yum:
+        name:
+          - filebeat
+          - metricbeat
+          - auditbeat
+          - packetbeat
+          - journalbeat
+        state: present
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+     
+
+
+    - name: Configure Filebeat AWS West
+      copy:
+        dest: "/etc/filebeat/filebeat.yml"
+        content: |
+          filebeat.inputs:
+          - type: log
+            enabled: true
+            paths:
+              - /var/log/*.log
+              - /var/log/secure
+              - /var/log/messages
+          filebeat.config.modules:
+            path: ${path.config}/modules.d/*.yml
+            reload.enabled: false
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-b97d8817ba02d979.elb.us-gov-west-1.amazonaws.com:5046"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+            - add_kubernetes_metadata: ~
+      when: (aws_region == "us-gov-west-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))
+      
+    - name: Configure Metricbeat AWS West
+      copy:
+        dest: "/etc/metricbeat/metricbeat.yml"
+        content: |
+          metricbeat.config.modules:
+            path: ${path.config}/modules.d/*.yml
+          reload.enabled: false
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-b97d8817ba02d979.elb.us-gov-west-1.amazonaws.com:5044"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+            - add_kubernetes_metadata: ~
+      when: (aws_region == "us-gov-west-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))
+      
+    - name: Configure Packetbeat AWS West
+      copy:
+        dest: "/etc/packetbeat/packetbeat.yml"
+        content: |
+          packetbeat.interfaces.device: any
+          packetbeat.flows:
+            timeout: 30s
+            period: 10s
+          packetbeat.protocols:
+          - type: icmp
+            enabled: true
+          - type: amqp
+            ports: [5672]
+          - type: cassandra
+            ports: [9042]
+          - type: dhcpv4
+            ports: [67, 68]
+          - type: dns
+            ports: [53]
+          - type: http
+            ports: [80, 8080, 8000, 5000, 8002]
+          - type: memcache
+            ports: [11211]
+          - type: mysql
+            ports: [3306,3307]
+          - type: pgsql
+            ports: [5432]
+          - type: redis
+            ports: [6379]
+          - type: thrift
+            ports: [9090]
+          - type: mongodb
+            ports: [27017]
+          - type: nfs
+            ports: [2049]
+          - type: tls
+            ports:
+              - 443   # HTTPS
+              - 993   # IMAPS
+              - 995   # POP3S
+              - 5223  # XMPP over SSL
+              - 8443
+              - 8883  # Secure MQTT
+              - 9243  # Elasticsearch
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-b97d8817ba02d979.elb.us-gov-west-1.amazonaws.com:5047"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+      when: (aws_region == "us-gov-west-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))
+      
+    - name: Configure Journalbeat AWS West
+      copy:
+        dest: "/etc/journalbeat/journalbeat.yml"
+        content: |
+          journalbeat.inputs:
+          - paths: []
+            seek: cursor
+          output.logstash:
+            hosts: ["vaec-logstash-2rLoadBalancer2-beecc3051295b2ff.elb.us-gov-west-1.amazonaws.com:5050"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+      when: (aws_region == "us-gov-west-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))  
+      
+    - name: Configure Auditbeat AWS West
+      copy:
+        dest: "/etc/auditbeat/auditbeat.yml"
+        content: |
+          auditbeat.modules:
+          - module: auditd
+            audit_rule_files: [ "${path.config}/audit.rules.d/*.conf" ]
+            audit_rules: |
+          - module: file_integrity
+            paths:
+            - /bin
+            - /usr/bin
+            - /sbin
+            - /usr/sbin
+            - /etc
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-b97d8817ba02d979.elb.us-gov-west-1.amazonaws.com:5045"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+      when: (aws_region == "us-gov-west-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))  
+    
+    - name: Configure Filebeat AWS East
+      copy:
+        dest: "/etc/filebeat/filebeat.yml"
+        content: |
+          filebeat.inputs:
+          - type: log
+            enabled: true
+            paths:
+              - /var/log/*.log
+              - /var/log/secure
+              - /var/log/messages
+          filebeat.config.modules:
+            path: ${path.config}/modules.d/*.yml
+            reload.enabled: false
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-32aaa2177d77e693.elb.us-gov-east-1.amazonaws.com:5046"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+            - add_kubernetes_metadata: ~
+      when: (aws_region == "us-gov-east-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))
+      
+    - name: Configure Metricbeat AWS East
+      copy:
+        dest: "/etc/metricbeat/metricbeat.yml"
+        content: |
+          metricbeat.config.modules:
+            path: ${path.config}/modules.d/*.yml
+          reload.enabled: false
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-32aaa2177d77e693.elb.us-gov-east-1.amazonaws.com:5044"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+            - add_kubernetes_metadata: ~
+      when: (aws_region == "us-gov-east-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")) 
+      
+    - name: Configure Packetbeat AWS East
+      copy:
+        dest: "/etc/packetbeat/packetbeat.yml"
+        content: |
+          packetbeat.interfaces.device: any
+          packetbeat.flows:
+            timeout: 30s
+            period: 10s
+          packetbeat.protocols:
+          - type: icmp
+            enabled: true
+          - type: amqp
+            ports: [5672]
+          - type: cassandra
+            ports: [9042]
+          - type: dhcpv4
+            ports: [67, 68]
+          - type: dns
+            ports: [53]
+          - type: http
+            ports: [80, 8080, 8000, 5000, 8002]
+          - type: memcache
+            ports: [11211]
+          - type: mysql
+            ports: [3306,3307]
+          - type: pgsql
+            ports: [5432]
+          - type: redis
+            ports: [6379]
+          - type: thrift
+            ports: [9090]
+          - type: mongodb
+            ports: [27017]
+          - type: nfs
+            ports: [2049]
+          - type: tls
+            ports:
+              - 443   # HTTPS
+              - 993   # IMAPS
+              - 995   # POP3S
+              - 5223  # XMPP over SSL
+              - 8443
+              - 8883  # Secure MQTT
+              - 9243  # Elasticsearch
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-32aaa2177d77e693.elb.us-gov-east-1.amazonaws.com:5047"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+      when: (aws_region == "us-gov-east-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))
+      
+    - name: Configure Journalbeat AWS East
+      copy:
+        dest: "/etc/journalbeat/journalbeat.yml"
+        content: |
+          journalbeat.inputs:
+          - paths: []
+            seek: cursor
+          output.logstash:
+            hosts: ["vaec-logstash-2rLoadBalancer2-414e073a5442bac1.elb.us-gov-east-1.amazonaws.com:5050"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+      when: (aws_region == "us-gov-east-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))  
+      
+    - name: Configure Auditbeat AWS East
+      copy:
+        dest: "/etc/auditbeat/auditbeat.yml"
+        content: |
+          auditbeat.modules:
+          - module: auditd
+            audit_rule_files: [ "${path.config}/audit.rules.d/*.conf" ]
+            audit_rules: |
+          - module: file_integrity
+            paths:
+            - /bin
+            - /usr/bin
+            - /sbin
+            - /usr/sbin
+            - /etc
+          output.logstash:
+            hosts: ["vaec-logstash-1rLoadBalancer1-32aaa2177d77e693.elb.us-gov-east-1.amazonaws.com:5045"]
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+      when: (aws_region == "us-gov-east-1") and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2"))
+    
+    - name: Link Auditd Rules to Auditbeat
+      file:
+        src: /etc/audit/audit.rules
+        dest: /etc/auditbeat/audit.rules.d/audit.conf
+        owner: root
+        group: root
+        state: link
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+      
+    - name: Configure Metricbeat System
+      copy:
+        dest: "/etc/metricbeat/modules.d/system.yml"
+        content: |
+          # Module: system
+          # Docs: https://www.elastic.co/guide/en/beats/metricbeat/7.7/metricbeat-module-system.html
+
+          - module: system
+            period: 10s
+            metricsets:
+              - cpu
+              - load
+              - memory
+              - network
+              - process
+              - process_summary
+              - socket_summary
+              - entropy
+              - core
+              - diskio
+              - socket
+              - service
+          #    - users
+            process.include_top_n:
+              by_cpu: 5      # include top 5 processes by CPU
+              by_memory: 5   # include top 5 processes by memory
+          - module: system
+            period: 1m
+            metricsets:
+              - filesystem
+              - fsstat
+            processors:
+            - drop_event.when.regexp:
+                system.filesystem.mount_point: '^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)'
+          - module: system
+            period: 15m
+            metricsets:
+              - uptime  
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+            
+# SETUP RESTART if Config Change.        
+    - name: Enable and Restart 
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      with_items:
+        - 'filebeat'
+        - 'metricbeat'
+        - 'auditbeat'
+        - 'packetbeat'
+        - 'journalbeat'
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2")
+        

@@ -1,0 +1,38 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: VAEC Cloudwatch Logs
+Parameters:
+  pVPCFlowLogAccountNumber:
+    Type: String
+    Default: 348021725816
+Resources:
+    rElasticserachAuditSubscription:
+        Type: AWS::Logs::SubscriptionFilter
+        Properties:
+            DestinationArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${pVPCFlowLogAccountNumber}:destination:vaec-cloudwatch-logs-1
+            FilterPattern: ""
+            LogGroupName: /aws/aes/domains/vaec-log/audit-logs
+    rElasticserachSearchSubscription:
+        Type: AWS::Logs::SubscriptionFilter
+        Properties:
+            DestinationArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${pVPCFlowLogAccountNumber}:destination:vaec-cloudwatch-logs-1
+            FilterPattern: ""
+            LogGroupName: /aws/aes/domains/vaec-log/search-logs
+    rElasticserachIndexSubscription:
+        Type: AWS::Logs::SubscriptionFilter
+        Properties:
+            DestinationArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${pVPCFlowLogAccountNumber}:destination:vaec-cloudwatch-logs-1
+            FilterPattern: ""
+            LogGroupName: /aws/aes/domains/vaec-log/index-logs
+    rElasticserachErrorSubscription:
+        Type: AWS::Logs::SubscriptionFilter
+        Properties:
+            DestinationArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${pVPCFlowLogAccountNumber}:destination:vaec-cloudwatch-logs-1
+            FilterPattern: ""
+            LogGroupName: /aws/aes/domains/vaec-log/application-logs
+    rElasticserachCuratorSubscription:
+        Type: AWS::Logs::SubscriptionFilter
+        Properties:
+            DestinationArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${pVPCFlowLogAccountNumber}:destination:vaec-cloudwatch-logs-1
+            FilterPattern: ""
+            LogGroupName: /aws/lambda/vaec-es-curator-rESCuratorFunction-2UAEP6HN60CR

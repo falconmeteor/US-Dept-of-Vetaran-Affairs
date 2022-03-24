@@ -1,0 +1,73 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: VAEC Cloudwatch Log Handler
+Parameters:
+    pCWLDest:
+        Description: CloudwatchLog Destination for Put Subscription Filter
+        Type: String
+        Default: vaec-cloudwatch-logs-1
+    pStreamName:
+        Description:  Stream Destination Name
+        Type: String
+        Default: vaec-cloudwatch-logs-stream-1
+
+Resources:
+    rCWLtoKinesisStreamRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub cwl-to-kinesis-stream-${AWS::Region}
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                        Service:
+                        - !Sub logs.${AWS::Region}.amazonaws.com
+                      Action:
+                      - sts:AssumeRole
+            ManagedPolicyArns:
+                - !Ref rCWLtoKinesisStreamPolicy
+
+    rCWLtoKinesisStreamPolicy:
+        Type: AWS::IAM::ManagedPolicy
+        Properties:
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+              - kinesis:PutRecord*
+              Resource:
+              - !Sub ${rKinesisStream.Arn}
+            - Effect: Allow
+              Action:
+              - iam:PassRole
+              Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cwl-to-kinesis-stream-${AWS::Region}
+
+    rCWLDestination:
+        Type: AWS::Logs::Destination
+        Properties:
+            DestinationName: !Ref pCWLDest
+            DestinationPolicy: !Sub |
+                    {
+                      "Version": "2012-10-17",
+                      "Statement": [
+                        {
+                          "Effect": "Allow",
+                          "Principal": {
+                            "AWS": ["${AWS::AccountId}", "348286891446", "558384143803", "311937954251", "804298029709", "479075246528", "704651196980", "636418262128", "278367118256", "636359643995", "940676995568", "558714365120", "150620732311", "463840922484"]
+                          },
+                          "Action": "logs:PutSubscriptionFilter",
+                          "Resource": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:destination:${pCWLDest}"
+                        }
+                      ]
+                    }
+            RoleArn: !Sub ${rCWLtoKinesisStreamRole.Arn}
+            TargetArn: !Sub ${rKinesisStream.Arn}
+
+    rKinesisStream:
+        Type: AWS::Kinesis::Stream
+        Properties:
+            Name: !Ref pStreamName
+            ShardCount: 3

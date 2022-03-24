@@ -1,0 +1,38 @@
+- name: docker cert updater
+  remote_user: "{{ssh_user}}"
+  become: yes
+  become_method: sudo
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Check to see if VA Certs are Installed
+      shell:
+        cmd: trust list | grep VA | wc -l
+      register: vacertcount
+      
+    - name: Set VA Cert Count Fact
+      set_fact: va_cert_count="{{ vacertcount.stdout }}"
+
+    - name: Yum Install Prereq
+      yum:
+        name:
+          - wget
+        state: present
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8")
+            
+    - name: Download VA Certs RHEL or Amazon Linux 2
+      shell: wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/InternalNetCA1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/InternalSubCA1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/InternalSubCA2.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-E5-ICA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-E5-RCA1-va.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA2-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA3-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA4.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA5.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA6.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA7.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA8.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA9.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-RCA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VAFIM1-Internal-S2-ICA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VAFIM1-Internal-S2-RCA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VAInternalRoot.cer -P /etc/pki/ca-trust/source/anchors/
+      when: (va_cert_count | int < 5) and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8"))
+            
+    - name: Update Trusted Certs
+      shell: update-ca-trust
+      when: (va_cert_count | int < 5) and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8"))
+    

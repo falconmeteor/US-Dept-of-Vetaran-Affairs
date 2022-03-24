@@ -1,0 +1,277 @@
+{
+    "type" : "monitor",
+    "schema_version" : 3,
+    "name" : "gss-prod-disk-space-used-greater-than-95-percent",
+    "enabled" : true,
+    "schedule" : {
+      "period" : {
+        "interval" : 2,
+        "unit" : "HOURS"
+      }
+    },
+    "inputs" : [
+      {
+        "search" : {
+          "indices" : [
+            "metrics*"
+          ],
+          "query" : {
+            "size" : 0,
+            "query" : {
+              "bool" : {
+                "must" : [
+                  {
+                    "range" : {
+                      "system.filesystem.used.pct" : {
+                        "from" : 0.95,
+                        "to" : null,
+                        "include_lower" : true,
+                        "include_upper" : true,
+                        "boost" : 2.0
+                      }
+                    }
+                  }
+                ],
+				"must_not": [
+                {
+                    "regexp": {
+                        "host.hostname": ".*[4-9][0-9][0-9].*"
+                    }
+		},
+		{
+                    "terms": {
+                        "system.filesystem.mount_point": [
+                            "/splunk_s3_cache"
+                        ],
+                        "boost": 1
+                    }
+                }
+            ],
+                "filter" : [
+                  {
+                    "range" : {
+                      "@timestamp" : {
+                        "from" : "{{period_end}}||-15m",
+                        "to" : "{{period_end}}",
+                        "include_lower" : true,
+                        "include_upper" : true,
+                        "format" : "epoch_millis",
+                        "boost" : 1.0
+                      }
+                    }
+                  },
+                  {
+                    "terms" : {
+                      "cloud.account.id" : [
+                        "348021725816",
+                        "348286891446",
+                        "558384143803",
+                        "479075246528",
+                        "804298029709",
+                        "311937954251"
+                      ],
+                      "boost" : 1.0
+                    }
+		  },
+		  {
+		    "bool": {
+		      "must_not": {
+			"terms": {
+			  "cloud.instance.id" : [
+			    "i-01b6793dcd4d21e02"
+			  ],
+			  "boost" : 1.0
+			}
+		      }
+		    }
+	  	  }		
+                ],
+                "adjust_pure_negative" : true,
+                "boost" : 1.0
+              }
+            },
+            "aggregations": {
+        "region": {
+            "terms": {
+                "field": "cloud.region",
+                "size": 10,
+                "min_doc_count": 1,
+                "shard_min_doc_count": 0,
+                "show_term_doc_count_error": false,
+                "order": [
+                    {
+                        "_count": "desc"
+                    },
+                    {
+                        "_key": "asc"
+                    }
+                ]
+            },
+            "aggregations": {
+                "account": {
+                    "terms": {
+                        "field": "cloud.account.id",
+                        "size": 10,
+                        "min_doc_count": 1,
+                        "shard_min_doc_count": 0,
+                        "show_term_doc_count_error": false,
+                        "order": [
+                            {
+                                "_count": "desc"
+                            },
+                            {
+                                "_key": "asc"
+                            }
+                        ]
+                    },
+                    "aggregations": {
+                        "instanceid": {
+                            "terms": {
+                                "field": "cloud.instance.id",
+                                "size": 10,
+                                "min_doc_count": 1,
+                                "shard_min_doc_count": 0,
+                                "show_term_doc_count_error": false,
+                                "order": [
+                                    {
+                                        "_count": "desc"
+                                    },
+                                    {
+                                        "_key": "asc"
+                                    }
+                                ]
+                            },
+                            "aggregations": {
+                                "hosts": {
+                                    "terms": {
+                                        "field": "host.name",
+                                        "size": 10,
+                                        "min_doc_count": 1,
+                                        "shard_min_doc_count": 0,
+                                        "show_term_doc_count_error": false,
+                                        "order": [
+                                            {
+                                                "_count": "desc"
+                                            },
+                                            {
+                                                "_key": "asc"
+                                            }
+                                        ]
+                                    },
+                                    "aggregations": {
+                                        "mount_point": {
+                                            "terms": {
+                                                "field": "system.filesystem.mount_point",
+                                                "size": 10,
+                                                "min_doc_count": 1,
+                                                "shard_min_doc_count": 0,
+                                                "show_term_doc_count_error": false,
+                                                "order": [
+                                                    {
+                                                        "_count": "desc"
+                                                    },
+                                                    {
+                                                        "_key": "asc"
+                                                    }
+                                                ]
+                                            },
+                                            "aggregations": {
+                                                "fs": {
+                                                    "max": {
+                                                        "field": "system.filesystem.used.pct"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+        }
+      }
+    ],
+    "triggers" : [
+      {
+        "name" : "gss-prod-disk-space-used-greater-than-95-percent",
+        "severity" : "2",
+        "condition" : {
+          "script" : {
+            "source" : "ctx.results[0].hits.total.value > 0",
+            "lang" : "painless"
+          }
+        },
+        "actions" : [
+          {
+            "name" : "Send Email COMS",
+            "destination_id" : "F8JG53IBz9Q1aMdkB9FZ",
+            "message_template" : {
+              "source" : """Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.
+- Trigger: {{ctx.trigger.name}}
+- Severity: {{ctx.trigger.severity}}
+- Period start: {{ctx.periodStart}}
+- Period end: {{ctx.periodEnd}}
+
+{{#ctx.results}}
+{{#aggregations.region.buckets}}
+Region: {{key}}
+{{#account.buckets}}
+     Account: {{key}}
+{{#instanceid.buckets}}
+          Instance ID: {{key}}
+{{#hosts.buckets}}
+          Hostname: {{key}}
+{{#mount_point.buckets}}
+               Mount Point: {{key}}
+               Utilization: {{fs.value}}
+{{/mount_point.buckets}}
+{{/hosts.buckets}}
+{{/instanceid.buckets}}
+{{/account.buckets}}
+{{/aggregations.region.buckets}}
+{{/ctx.results}}
+*Note that the utilization is not in Percent format it is in Decimal format.  To get percent format multiply that number by 100.
+
+SEV 1:
+    Definition:  Immediate action is required meaning something is down or a feature that has been working in the past currently is not working.
+    ECSD Working Hours Action:  Callout
+    ECSD After Hours Action: Callout
+
+SEV 2:
+    Definition: Action is required within 2 hours to possibly prevent an outage or an upgrade to SEV 1.
+    ECSD Working Hours Action:  Ignore
+    ECSD After Hours Action: Callout
+
+SEV 3:
+    Definition:  An alert that has no potential to cause a higher SEV Level within 1 Day.
+    ECSD Working Hours Action: Ignore
+    ECSD After Hours Action: Ignore
+
+SEV 4:
+    Definition: Informational alert such as privilege escalation.  This information has no action, however needs to be reviewed.
+    ECSD Working Hours Action: Ignore
+    ECSD After Hours Action: Ignore
+
+SEV 5:
+    Definition: Informational alert for non-privilege escalation.  This information has no action, however needs to be reviewed.
+    ECSD Working Hours Action: Ignore
+    ECSD After Hours Action: Ignore
+
+""",
+              "lang" : "mustache"
+            },
+            "throttle_enabled" : false,
+            "subject_template" : {
+              "source" : "gss-prod-disk-space-used-greater-than-95-percent",
+              "lang" : "mustache"
+            }
+          }
+        ]
+      }
+    ]
+}

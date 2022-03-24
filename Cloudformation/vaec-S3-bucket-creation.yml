@@ -1,0 +1,102 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: VAEC AWS account initialization - Project Tags, VAEC automation S3
+Parameters:
+  pProjectName:
+    Description:  ProjectName Tag
+    Type: String
+    Default: <ProjectName>
+  pProjectShort:
+    Description:  ProjectShort Tag
+    Type: String
+    Default: <ProjectShort>
+  pVAECId:
+    Description: VAECID Tag
+    Type: String
+    Default: <VAECID>
+  pEnvironmentTag:
+    Description: Default Environment Tag
+    Type: String
+    Default: Production
+    AllowedValues: [Development, Stage, Production, CORE, SECURITY, SECURITYLOGS]
+  pBucketNamePrefix:
+    Description:  Bucket Name prefix - will be appended by AccountId
+    Type: String
+    Default: vaec-automation
+    AllowedPattern: "[a-z][a-z0-9-]*"
+    ConstraintDescription: Must begin with a letter and contain only lowercase alphanumeric characters or hyphens
+  
+Resources:
+  rS3Bucket:
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Sub ${pBucketNamePrefix}-${AWS::AccountId}
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+            - ServerSideEncryptionByDefault: 
+                SSEAlgorithm: aws:kms
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: VAECID
+          Value: !Ref pVAECId
+        - Key: pProjectName
+          Value: !Ref pProjectName
+        - Key: Environment
+          Value: !Ref pEnvironmentTag
+        - Key: pProjectShort
+          Value: !Ref pProjectShort
+  rS3Bucket2:
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Sub ${pBucketNamePrefix}-${AWS::AccountId}-${AWS::Region}
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+            - ServerSideEncryptionByDefault: 
+                SSEAlgorithm: aws:kms
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: VAECID
+          Value: !Ref pVAECId
+        - Key: pProjectName
+          Value: !Ref pProjectName
+        - Key: Environment
+          Value: !Ref pEnvironmentTag
+        - Key: pProjectShort
+          Value: !Ref pProjectShort
+          
+Outputs:
+  oProjectName:
+    Description: ProjectName Tag
+    Value: !Ref pProjectName
+    Export:
+       Name: !Sub ${AWS::StackName}-tag-ProjectName
+
+  oProjectShort:
+    Description: ProjectShort Tag
+    Value: !Ref pProjectShort
+    Export:
+       Name: !Sub ${AWS::StackName}-tag-ProjectShort
+
+  oVAECId:
+    Description: VAECID  Tag
+    Value: !Ref pVAECId
+    Export:
+       Name: !Sub ${AWS::StackName}-tag-VAECID
+
+  oEnvironment:
+    Description: Default Environment Tag
+    Value: !Ref pEnvironmentTag
+    Export:
+       Name: !Sub ${AWS::StackName}-tag-Environment
+
+  oAutomationS3Bucket:
+    Description: VAEC automation S3 Bucket URL
+    Value: !Ref rS3Bucket
+    Export:
+       Name: !Sub ${AWS::StackName}-automations3bucket

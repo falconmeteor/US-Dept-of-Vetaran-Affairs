@@ -1,0 +1,12 @@
+---
+- name: vaec gold partner linux software update playbook
+  remote_user: "azureuser"
+  become: yes
+  become_method: sudo
+  hosts: all
+  gather_facts: true
+  tasks:
+  - name: update system packages
+    yum:
+      name: "*"
+      state: latest

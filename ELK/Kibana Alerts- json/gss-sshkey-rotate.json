@@ -1,0 +1,121 @@
+{
+    "type" : "monitor",
+    "schema_version" : 3,
+    "name" : "gss-sshkey-rotate",
+    "enabled" : true,
+    "schedule" : {
+      "period" : {
+        "interval" : 30,
+        "unit" : "DAYS"
+      }
+    },
+    "inputs" : [
+      {
+        "search" : {
+          "indices" : [
+            "cwl*"
+          ],
+          "query" : {
+            "size": 0,
+    "query": {
+        "bool": {
+            "must": [
+                {
+                    "wildcard": {
+                        "logGroup": {
+                            "wildcard": "*rLambdaSSHKeyRotate*",
+                            "boost": 1
+                        }
+                    }
+                },
+                {
+                    "wildcard": {
+                        "message": {
+                            "wildcard": "*errno*",														
+                            "boost": 1
+                        }
+                    }
+                }
+            ],
+            "filter": [
+                {
+                    "range": {
+                        "@timestamp": {
+                            "from": "{{period_end}}||-30d",
+                            "to": "{{period_end}}",
+                            "include_lower": true,
+                            "include_upper": true,
+                            "format": "epoch_millis",
+                            "boost": 1
+                        }
+                    }
+                },
+				  {
+                    "terms" : {
+                      "owner" : [
+                        "348021725816",
+                        "348286891446",
+                        "558384143803",
+                        "479075246528",
+                        "804298029709",
+                        "311937954251"
+                      ],
+                      "boost" : 1.0
+                    }
+                  }
+            ],
+            "adjust_pure_negative": true,
+            "boost": 1
+        }
+    },
+    "aggregations": {
+        "account": {
+            "terms": {
+                "field": "owner.keyword",
+                "size": 10,
+                "min_doc_count": 1,
+                "shard_min_doc_count": 0,
+                "show_term_doc_count_error": false,
+                "order": [
+                    {
+                        "_count": "desc"
+                    },
+                    {
+                        "_key": "asc"
+                    }
+                ]
+            }
+		}
+	}
+}
+}
+}
+],
+    "triggers" : [
+      {
+        "name" : "gss-sshkey-rotate",
+        "severity" : "3",
+        "condition" : {
+          "script" : {
+            "source" : "ctx.results[0].hits.total.value > 0",
+            "lang" : "painless"
+          }
+        },
+        "actions" : [
+          {
+            "name" : "Send Email COMS",
+            "destination_id" : "F8JG53IBz9Q1aMdkB9FZ",
+            "message_template" : {
+              "source" : "Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n\nThis error indicates that the Lambda function *rLambdaSSHKeyRotate* failed in the account(s) listed below and needs to be investigated.\n\n- Trigger: {{ctx.trigger.name}}\n- Severity: {{ctx.trigger.severity}}\n- Period start: {{ctx.periodStart}}\n- Period end: {{ctx.periodEnd}}\n\n{{#ctx.results}}\n{{#aggregations.account.buckets}}\nAccount: {{key}}\n{{/aggregations.account.buckets}}\n{{/ctx.results}}\n\nSEV 1:\n    Definition:  Immediate action is required meaning something is down or a feature that has been working in the past currently is not working.\n    ECSD Working Hours Action:  Callout\n    ECSD After Hours Action: Callout\n\nSEV 2:\n    Definition: Action is required within 2 hours to possibly prevent an outage or an upgrade to SEV 1.\n    ECSD Working Hours Action:  Ignore\n    ECSD After Hours Action: Callout\n\nSEV 3:\n    Definition:  An alert that has no potential to cause a higher SEV Level within 1 Day.\n    ECSD Working Hours Action: Ignore\n    ECSD After Hours Action: Ignore\n\nSEV 4:\n    Definition: Informational alert such as privilege escalation.  This information has no action, however needs to be reviewed.\n    ECSD Working Hours Action: Ignore\n    ECSD After Hours Action: Ignore\n\nSEV 5:\n    Definition: Informational alert for non-privilege escalation.  This information has no action, however needs to be reviewed.\n    ECSD Working Hours Action: Ignore\n    ECSD After Hours Action: Ignore\n",
+              "lang" : "mustache"
+            },
+            "throttle_enabled" : false,
+            "subject_template" : {
+              "source" : "gss-sshkey-rotate",
+              "lang" : "mustache"
+            }
+          }
+        ]
+      }
+	]
+}

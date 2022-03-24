@@ -1,0 +1,39 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cls
+  labels:
+    app: cls-deployment
+  namespace: cls
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: cls
+  template:
+    metadata:
+      labels:
+        app: cls
+    spec:
+      containers:
+      - name: odfe-node1-master
+        image: vac20aksacr800.azurecr.us/elasticsearch-cls:v1
+        ports:
+        - containerPort: 9200
+          name: elasticsearch
+        - containerPort: 9600
+          name: performance	#required for Performance Analyzer  
+      - name: odfe-node2-worker
+        image: vac20aksacr800.azurecr.us/elasticsearch-cls:v1
+        ports:
+        - containerPort: 9200
+          name: elasticsearch
+        - containerPort: 9600
+          name: performance	#required for Performance Analyzer	  
+      - name: odfe-kibana
+        image: vac20aksacr800.azurecr.us/kibana-cls:v1
+        ports:
+        - containerPort: 5601
+          name: kibana
+

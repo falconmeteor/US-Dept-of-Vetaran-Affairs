@@ -1,0 +1,134 @@
+- name: vaec aws gss dsc
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Get Region
+      shell:
+        cmd: curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//'
+      register: region
+     
+    - name: Set Region Fact
+      set_fact: aws_region="{{ region.stdout }}"
+      
+    - name: Check to see if VA Certs are Installed
+      shell:
+        cmd: trust list | grep VA | wc -l
+      register: vacertcount
+      
+    - name: Set VA Cert Count Fact
+      set_fact: va_cert_count="{{ vacertcount.stdout }}"
+      
+    - name: Create VA Mirror List
+      copy:
+        dest: "/etc/yum.repos.d/va-mirror-base"
+        content: |
+          https://aws-west-repos.vaec.va.gov/repos
+          https://aws-east-repos.vaec.va.gov/repos
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8")
+      
+    - name: VA-Binaries-Repo
+      yum_repository:
+        name: VA-Binaries
+        description: CSP yum repo to get VA specific binaries
+        file: va  
+        mirrorlist: file:///etc/yum.repos.d/va-mirror-base
+        gpgcheck: no
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8")
+     
+    - name: Yum Install Prereq
+      yum:
+        name:
+          - wget
+        state: present
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8")
+            
+    - name: Download VA Certs RHEL or Amazon Linux 2
+      shell: wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/InternalNetCA1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/InternalSubCA1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/InternalSubCA2.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-E5-ICA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-E5-RCA1-va.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA2-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA3-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA4.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA5.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA6.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA7.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA8.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-ICA9.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VA-Internal-S2-RCA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VAFIM1-Internal-S2-ICA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VAFIM1-Internal-S2-RCA1-v1.cer -P /etc/pki/ca-trust/source/anchors/ && wget -r -np -nH --cut-dirs 5 -A.cer http://aia.pki.va.gov/PKI/AIA/VA/VAInternalRoot.cer -P /etc/pki/ca-trust/source/anchors/
+      when: (va_cert_count | int < 5) and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8"))
+            
+    - name: Update Trusted Certs
+      shell: update-ca-trust
+      when: (va_cert_count | int < 5) and
+            ((ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7") or
+            (ansible_facts['distribution'] == "Amazon" and ansible_facts['distribution_major_version'] == "2") or
+            (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8"))
+    
+    - name: Import Beats Playbook
+      include: beats.yml
+            
+    - name: Import CRISP Playbook
+      include: crisp.yml
+      
+    - name: Import sys-improvements Playbook
+      include: sys-improvements.yml
+             
+    - name: Import Stig playbook
+      include: ../../../common/rhel7/ansible/vaec-rhel7-va-stig.yml
+      when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "7")
+      
+    - name: remove f -2 in audit.rules
+      lineinfile:
+        create: false
+        dest: /etc/audit/audit.rules
+        regexp: '^-f'
+        state: absent
+        
+    - name: remove -b in audit.rules
+      lineinfile:
+        create: false
+        dest: /etc/audit/audit.rules
+        regexp: '^-b'
+        state: absent
+        
+    - name: remove -D in audit.rules
+      lineinfile:
+        create: false
+        dest: /etc/audit/audit.rules
+        regexp: '^-D'
+        state: absent
+        backrefs: true
+      
+    #- name: Import Stig playbook
+    #  include: ../../../common/rhel8/ansible/vaec-rhel8-stig.yml
+    #  when: (ansible_facts['distribution'] == "RedHat" and ansible_facts['distribution_major_version'] == "8")
+              
+
+
+  handlers:
+  - name: restart filebeat
+    service:
+      name: filebeat
+      state: restarted
+  - name: restart metricbeat
+    service:
+      name: metricbeat
+      state: restarted
+  - name: restart journalbeat
+    service:
+      name: journalbeat
+      state: restarted
+  - name: restart packetbeat
+    service:
+      name: packetbeat
+      state: restarted
+  - name: restart audit
+    service:
+      name: auditbeat
+      state: restarted
+  - name: restart besclient
+    service:
+      name: besclient
+      state: restarted
+  - name: restart centrify-sshd
+    service:
+      name: centrify-sshd
+      state: restarted

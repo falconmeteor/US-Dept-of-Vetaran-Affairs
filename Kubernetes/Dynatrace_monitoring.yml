@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Create Dynatrace Monitoring Policy and Role'
+Resources:
+  rDynatraceMonitoringPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: Dynatrace_monitoring_policy
+      Description: Project Administrator created Application Policy
+      Path: /
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DynatraceAwsServicesMonitoring
+            Effect: Allow
+            Action:
+              - 'autoscaling:DescribeAutoScalingGroups'
+              - 'cloudwatch:GetMetricData'
+              - 'ec2:DescribeAvailabilityZones'
+              - 'ec2:DescribeInstances'
+              - 'ec2:DescribeVolumes'
+              - 'elasticloadbalancing:DescribeLoadBalancers'
+              - 'elasticloadbalancing:DescribeTags'
+              - 'elasticloadbalancing:DescribeInstanceHealth'
+              - 'elasticloadbalancing:DescribeListeners'
+              - 'elasticloadbalancing:DescribeRules'
+              - 'elasticloadbalancing:DescribeTargetHealth'
+              - 'rds:DescribeDBInstances'
+              - 'rds:DescribeEvents'
+              - 'rds:ListTagsForResource'
+              - 'dynamodb:ListTables'
+              - 'dynamodb:ListTagsOfResource'
+              - 'lambda:ListFunctions'
+              - 'lambda:ListTags'
+              - 'elasticbeanstalk:DescribeEnvironments'
+              - 'elasticbeanstalk:DescribeEnvironmentResources'
+              - 's3:ListAllMyBuckets'
+              - 'sts:GetCallerIdentity'
+              - 'cloudformation:ListStackResources'
+              - 'tag:GetResources'
+              - 'tag:GetTagKeys'
+              - 'cloudwatch:ListMetrics'
+              - 'kinesisvideo:ListStreams'
+              - 'sns:ListTopics'
+              - 'sqs:ListQueues'
+              - 'ec2:DescribeNatGateways'
+              - 'ec2:DescribeSpotFleetRequests'
+              - 'kinesis:ListStreams'
+              - 'es:ListDomainNames'
+              - 'cloudfront:ListDistributions'
+              - 'firehose:ListDeliveryStreams'
+              - 'elasticmapreduce:ListClusters'
+              - 'kinesisanalytics:ListApplications'
+              - 'elasticache:DescribeCacheClusters'
+              - 'elasticfilesystem:DescribeFileSystems'
+              - 'ecs:ListClusters'
+              - 'redshift:DescribeClusters'
+              - 'rds:DescribeDBClusters'
+              - 'apigateway:GET'
+            Resource:
+              - '*'
+  rDynatraceMonitoringRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: Dynatrace_monitoring_role
+      Path: /
+      PermissionsBoundary: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/vaec/project-admin'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: arn:aws-us-gov:iam::558384143803:role/dynatrace_prod_activegate_role
+            Action:
+              - 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': 'ef70d738-7149-46ba-8031-2dc4d41dff9d'   
+      ManagedPolicyArns:
+        - !Ref rDynatraceMonitoringPolicy

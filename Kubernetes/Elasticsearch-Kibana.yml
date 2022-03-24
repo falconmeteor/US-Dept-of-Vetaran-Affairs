@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: Centralized Logging Solution
+  labels:
+    app: cls-deployment
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: cls
+  template:
+    metadata:
+      labels:
+        app: cls
+    spec:
+      containers:
+      - name: odfe-node1-Master
+        image: <acr-name>.azurecr.io/elasticsearch:v1
+		env:
+		- name: cluster.name
+		  value: odfe-cluster
+		- name: node.name
+		  value: odfe-node1
+		- name:discover.seed_hosts
+		  value: odfe-node1,odfe-node2
+		- name: cluster.initial_master_nodes
+		  value: odfe-node1,odfe-node2 
+		- name: bootstrap.memory_lock
+		  value: true
+		- name: "ES_JAVA_OPTS" #along with the memlock settings below, disables swapping
+		  value: "Xms512m -Xmx512m" #minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+        ports:
+        - containerPort: 9200
+		  name: Elasticsearch
+        - containerPort: 9600
+		  name: Elasticsearch-Performance-Analyzer	#required for Performance Analyzer  
+      - name: odfe-node2-Worker
+        image: <acr-name>.azurecr.io/elasticsearch:v1
+		env:
+		- name: cluster.name
+		  value: 
+		- name: node.name
+		  value:
+		- name:discover.seed_hosts
+		  value:
+		- name: cluster.initial_master_nodes
+		  value: 
+		- name: bootstrap.memory_lock
+		  value: true
+		- name: "ES_JAVA_OPTS" #along with the memlock settings below, disables swapping
+		  value: "Xms512m -Xmx512m" #minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+        ports:
+        - containerPort: 9200
+		  name: Elasticsearch
+        - containerPort: 9600
+		  name: Elasticsearch-Performance-Analyzer	#required for Performance Analyzer	  

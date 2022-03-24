@@ -1,0 +1,173 @@
+{
+    "type" : "monitor",
+    "schema_version" : 3,
+    "name" : "gss-linux-local-user-deletion",
+    "enabled" : true,
+    "schedule" : {
+      "period" : {
+        "interval" : 15,
+        "unit" : "MINUTES"
+      }
+    },
+    "inputs" : [
+      {
+        "search" : {
+          "indices" : [
+            "unix-system*"
+          ],							   			 
+		  "query" : {
+			"size": 0,
+    "query": {
+        "bool": {
+            "must": [
+                {
+                    "match_phrase": {
+                            "message": {
+                            "query": "delete user",
+                            "slop": 0,
+                            "zero_terms_query": "NONE",
+                            "boost": 1
+                        }
+                    }
+                }
+            ],
+            "filter": [
+                {
+                    "range": {
+                        "@timestamp": {
+                            "from": "{{period_end}}||-15m",
+                            "to": "{{period_end}}",
+                            "include_lower": true,
+                            "include_upper": true,
+                            "format": "epoch_millis",
+                            "boost": 1
+                        }
+                    }
+                },
+                {
+                    "terms": {
+                        "cloud.account.id": [
+                            "348286891446",
+                            "348021725816",
+                            "738197571344",
+                            "804298029709",
+                            "558384143803",
+                            "479075246528",
+                            "311937954251"
+                        ],
+                        "boost": 1
+                    }
+                }
+            ],
+            "adjust_pure_negative": true,
+            "boost": 1
+        }
+    },
+    "aggregations": {
+        "region": {
+            "terms": {
+                "field": "cloud.region",
+                "size": 10,
+                "min_doc_count": 1,
+                "shard_min_doc_count": 0,
+                "show_term_doc_count_error": false,
+                "order": [
+                    {
+                        "_count": "desc"
+                    },
+                    {
+                        "_key": "asc"
+                    }
+                ]
+            },
+            "aggregations": {
+                "account": {
+                    "terms": {
+                        "field": "cloud.account.id",
+                        "size": 10,
+                        "min_doc_count": 1,
+                        "shard_min_doc_count": 0,
+                        "show_term_doc_count_error": false,
+                        "order": [
+                            {
+                                "_count": "desc"
+                            },
+                            {
+                                "_key": "asc"
+                            }
+                        ]
+                    },
+                    "aggregations": {
+                        "hosts": {
+                            "terms": {
+                                "field": "host.name",
+                                "size": 10,
+                                "min_doc_count": 1,
+                                "shard_min_doc_count": 0,
+                                "show_term_doc_count_error": false,
+                                "order": [
+                                    {
+                                        "_count": "desc"
+                                    },
+                                    {
+                                        "_key": "asc"
+                                    }
+                                ]
+                            },
+                            "aggregations": {
+                                "user": {
+                                    "terms": {
+                                        "field": "process.cmd",
+                                        "size": 10,
+                                        "min_doc_count": 1,
+                                        "shard_min_doc_count": 0,
+                                        "show_term_doc_count_error": false,
+                                        "order": [
+                                            {
+                                                "_count": "desc"
+                                            },
+                                            {
+                                                "_key": "asc"
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+}
+}
+],
+    "triggers" : [
+      {
+        "name" : "gss-linux-local-user-deletion",
+        "severity" : "4",
+        "condition" : {
+          "script" : {
+            "source" : "ctx.results[0].hits.total.value > 0",
+            "lang" : "painless"
+          }
+        },
+        "actions" : [
+          {
+            "name" : "Send Email COMS",
+            "destination_id" : "F8JG53IBz9Q1aMdkB9FZ",
+            "message_template" : {
+              "source" : "Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n\n- Trigger: {{ctx.trigger.name}}\n- Severity: {{ctx.trigger.severity}}\n- Period start: {{ctx.periodStart}}\n- Period end: {{ctx.periodEnd}}\n\n{{#ctx.results}}\n{{#aggregations.region.buckets}}\nRegion: {{key}}\n{{#account.buckets}}\n     Account: {{key}}\n{{#hosts.buckets}}\n          Hostname: {{key}}\n{{#user.buckets}}\n              Local Account Deleted: {{key}}\n{{/user.buckets}}\n{{/hosts.buckets}}\n{{/account.buckets}}\n{{/aggregations.region.buckets}}\n{{/ctx.results}}\n\nSEV 1:\n    Definition:  Immediate action is required meaning something is down or a feature that has been working in the past currently is not working.\n    ECSD Working Hours Action:  Callout\n    ECSD After Hours Action: Callout\n\nSEV 2:\n    Definition: Action is required within 2 hours to possibly prevent an outage or an upgrade to SEV 1.\n    ECSD Working Hours Action:  Ignore\n    ECSD After Hours Action: Callout\n\nSEV 3:\n    Definition:  An alert that has no potential to cause a higher SEV Level within 1 Day.\n    ECSD Working Hours Action: Ignore\n    ECSD After Hours Action: Ignore\n\nSEV 4:\n    Definition: Informational alert such as privilege escalation.  This information has no action, however needs to be reviewed.\n    ECSD Working Hours Action: Ignore\n    ECSD After Hours Action: Ignore\n\nSEV 5:\n    Definition: Informational alert for non-privilege escalation.  This information has no action, however needs to be reviewed.\n    ECSD Working Hours Action: Ignore\n    ECSD After Hours Action: Ignore\n",
+              "lang" : "mustache"
+            },
+            "throttle_enabled" : false,
+            "subject_template" : {
+              "source" : "gss-linux-local-user-deletion",
+              "lang" : "mustache"
+            }
+          }
+        ]
+      }
+	]
+}

@@ -1,0 +1,93 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: AWS CloudFormation Application Stack
+Parameters:
+    CustomerSpecificTag:
+        Description: Set CustomerSpecific Tag
+        Type: String
+        Default: EnterpriseJump
+    PVRedHatGI:
+        Description: Enter the Red Hat Gold Image for these Servers
+        Type: String
+        Default: ami-0d4b5dfd23e99ded6
+    TrustedKeys:
+        Description: Enter the Trusted Key Name for these Servers
+        Type: "AWS::EC2::KeyPair::KeyName"
+        Default: entjump
+    ServerVar:
+        Description: Set Server Variables
+        Type: CommaDelimitedList
+        Default: "Jump01, Jump02, Jump03, Jump04"
+Resources:
+    server03:
+        Type: "AWS::EC2::Instance"
+        Properties: 
+            Tags:
+              - 
+                Key: Name
+                Value: !Join [ ":",[ !Ref CustomerSpecificTag, !Select [ "1", !Ref ServerVar] ]]
+            KeyName: !Ref TrustedKeys
+            InstanceType: t2.micro
+            SubnetId: !ImportValue ent-jump-rebuild-vpc-subnet1
+            Monitoring: "false"
+            Tenancy: default
+            ImageId: !Ref PVRedHatGI
+            EbsOptimized: "false"
+            SourceDestCheck: "true"
+            SecurityGroupIds: [!ImportValue ent-jump-rebuild-vpc-JumpSG]
+            BlockDeviceMappings:
+              - DeviceName: "/dev/sda1"
+                Ebs:
+                    VolumeType: gp2
+                    DeleteOnTermination: "true"
+                    VolumeSize: "10"
+    server04:
+        Type: "AWS::EC2::Instance"
+        Properties: 
+            Tags:
+              - 
+                Key: Name
+                Value: !Join [ ":",[ !Ref CustomerSpecificTag, !Select [ "2", !Ref ServerVar] ]]
+            KeyName: !Ref TrustedKeys
+            InstanceType: t2.micro
+            SubnetId: !ImportValue ent-jump-rebuild-vpc-subnet2
+            Monitoring: "false"
+            Tenancy: default
+            ImageId: !Ref PVRedHatGI
+            EbsOptimized: "false"
+            SourceDestCheck: "true"
+            SecurityGroupIds: [!ImportValue ent-jump-rebuild-vpc-JumpSG]
+            BlockDeviceMappings:
+              - DeviceName: "/dev/sda1"
+                Ebs:
+                    VolumeType: gp2
+                    DeleteOnTermination: "true"
+                    VolumeSize: "10"
+# Elastic file system
+    rElasticFileSystem:
+        Type: AWS::EFS::FileSystem
+        Properties:
+            Encrypted: true
+            FileSystemTags:
+              - Key: Name
+                Value: !Join [' ', [!Ref 'AWS::StackName', '-EFS']]
+              - Key: ProjectName
+                Value: !ImportValue vaec-init-tag-ProjectName
+              - Key: ProjectShort
+                Value: !ImportValue vaec-init-tag-ProjectShort
+              - Key: VAECID
+                Value: !ImportValue vaec-init-tag-VAECID
+              - Key: Environment
+                Value: !ImportValue vaec-init-tag-Environment
+    rEFSMountAz1:
+        Type: AWS::EFS::MountTarget
+        Properties:
+          FileSystemId: !Ref rElasticFileSystem
+          SecurityGroups: [!ImportValue ent-jump-rebuild-vpc-JumpSG]
+          SubnetId: !ImportValue ent-jump-rebuild-vpc-subnet1
+    rEFSMountAz2:
+        Type: AWS::EFS::MountTarget
+        Properties:
+          FileSystemId: !Ref rElasticFileSystem
+          SecurityGroups: [!ImportValue ent-jump-rebuild-vpc-JumpSG]
+          SubnetId: !ImportValue ent-jump-rebuild-vpc-subnet2
